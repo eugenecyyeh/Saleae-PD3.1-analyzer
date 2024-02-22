@@ -7,7 +7,7 @@ It fixes some problems:
    2. Preamble detects error due to tStartDrive tolerance for first falling edge of Pramble.
    3. Hard Reset cannot detect.
    4. Inter-frame Gap timing check to prevent wrong detection.
-   5. Support PD3.1 EPR mode (Did not do fully test yet)
+   5. Support PD3.1 EPR mode (Did not fully test yet)
 
 To implement this, you have to set Mechester ANA with below setting and and add Mechster ANA as the input of this extension
    1. Mode: BMC(FM1)
