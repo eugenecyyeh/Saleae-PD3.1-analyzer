@@ -23,8 +23,8 @@ encoding_lookup = {
 }
 
 Preamble_LSB ={
-    'preamble': [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
-    'preamble_63': [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
+    'Preamble': [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
+    'Preamble missing first of UI': [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
 }
 
 addresses = {
@@ -181,10 +181,8 @@ class Word():
 class Hla(HighLevelAnalyzer):
 
     result_types = {
-        'preamble': {'format': 'Preamble'},
+        'preamble': {'format': '{{data.preamble}}'},
         
-        'preamble_63': {'format': 'Preamble:first UI out of range'},
-
         'address': {'format': '{{data.address}}'},
 
         'header': {'format': '[Message Header][{{data.command_code}}]--Message ID: [{{data.message_id}}]--Number of Objects: [{{data.number_of_objects}}]--Spec Rev: [{{data.spec_revision}}]'},
@@ -433,18 +431,18 @@ class Hla(HighLevelAnalyzer):
                             x=x+1  
             #
             preamble_cmd = self.decode_preamble(self.leftover_bits)
-            if preamble_cmd == 'preamble_63':
-                print('Preamble:first UI out of range')
-                next = yield AnalyzerFrame('preamble_63', self.leftover_time[0], self.leftover_time_end[62],{'preamble_63':'first UI out of range'})
+            if preamble_cmd['preamble'] == 'Preamble missing first of UI':
+                print(preamble_cmd['preamble'])
+                next = yield AnalyzerFrame('preamble', self.leftover_time[0], self.leftover_time_end[62], preamble_cmd)
                 self.leftover_bits = self.leftover_bits[63:]
                 self.leftover_time = self.leftover_time[63:]
                 self.leftover_time_end = self.leftover_time_end[63:]
                 self.leftover_bits.append(next.data['data'])
                 self.leftover_time.append(next.start_time)
                 self.leftover_time_end.append(next.end_time)    
-            elif preamble_cmd == 'preamble':
-                print(preamble_cmd)
-                next = yield AnalyzerFrame('preamble', self.leftover_time[0], self.leftover_time_end[63], {'preamble':preamble_cmd})
+            elif preamble_cmd['preamble'] == 'Preamble':
+                print(preamble_cmd['preamble'])
+                next = yield AnalyzerFrame('preamble', self.leftover_time[0], self.leftover_time_end[63], preamble_cmd)
                 self.leftover_bits = self.leftover_bits[64:]
                 self.leftover_time = self.leftover_time[64:]
                 self.leftover_time_end = self.leftover_time_end[64:]
@@ -452,12 +450,17 @@ class Hla(HighLevelAnalyzer):
                 self.leftover_time.append(next.start_time)
                 self.leftover_time_end.append(next.end_time)
             else:
-                continue
+                print(preamble_cmd['preamble'])
+                import sys
+                sys.exit()
             #
             yield from self.get_bits(20)
             address_cmd = self.decode_address(self.leftover_bits)
-            print(address_cmd)
-            next = yield AnalyzerFrame('address', self.leftover_time[0], self.leftover_time_end[19], {'address': address_cmd})
+            print(address_cmd['address'])
+            #if address_cmd['address'] == 'Missing the SOP' :
+            #   import sys
+            #   sys.exit()
+            next = yield AnalyzerFrame('address', self.leftover_time[0], self.leftover_time_end[19], address_cmd)
             self.leftover_bits = self.leftover_bits[20:]
             self.leftover_time = self.leftover_time[20:]
             self.leftover_time_end = self.leftover_time_end[20:]
@@ -1935,8 +1938,11 @@ class Hla(HighLevelAnalyzer):
             #
             yield from self.get_bits(5)
             eop_cmd = self.decode_eop(self.leftover_bits)
-            print(eop_cmd)
-            next = yield AnalyzerFrame('eop', self.leftover_time[0], self.leftover_time_end[4], {'eop': eop_cmd})
+            print(eop_cmd['eop'])
+            #if eop_cmd['eop'] == 'Missing the EOP' :
+            #   import sys
+            #   sys.exit()
+            next = yield AnalyzerFrame('eop', self.leftover_time[0], self.leftover_time_end[4], eop_cmd)
             self.leftover_bits = self.leftover_bits[5:]
             self.leftover_time = self.leftover_time[5:]
             self.leftover_time_end = self.leftover_time_end[5:]
@@ -2014,22 +2020,26 @@ class Hla(HighLevelAnalyzer):
         for preamble in Preamble_LSB:
             #load address from addresses
             raw_preamble = Preamble_LSB[preamble]
-            #print(len(raw_preamble))
             match = True
+            data={'preamble': 'Missing the Preamble',
+            }         
             if bits[0]==0:
                 for i in range(64):
                     if bits[i] != raw_preamble[i]:
                         match = False
                 if match == True:
-                    return preamble
+                    data={'preamble': preamble,
+                    }
+                    return data                 
             elif bits[0]==1:
                 for i in range(63):
                     if bits[i] != raw_preamble[i]:
                         match = False
                 if match == True:
-                    return preamble
-        return 'Unknown Start'
-
+                    data={'preamble': preamble,
+                    }
+                    return data
+        return data
 
     def decode_address(self, bits):
         for address in addresses:
@@ -2044,12 +2054,16 @@ class Hla(HighLevelAnalyzer):
                     fiddle_sop.append(raw_address[word * 5 + 4 - bit])
                     #print(fiddle_sop)
             match = True
+            data = {'address': 'Missing the SOP',
+            }                      
             for i in range(20):
                 if bits[i] != fiddle_sop[i]:
                     match = False
             if match == True:
-                return address
-        return 'Unknown adderess*'
+                data = {'address': address,
+                }
+                return data
+        return data                      
 
     def decode_header(self, header, sop_type):
         extended = (header >> 15) & 0x01
@@ -2090,15 +2104,17 @@ class Hla(HighLevelAnalyzer):
         for EOP in EOP_LSB:
             #load address from addresses
             raw_eop = EOP_LSB[EOP]
-            #print(raw_eop)
             match = True
+            data = {'eop': 'Missing the EOP',
+            }      
             for i in range(5):
                 if bits[i] != raw_eop[i]:
                     match = False
             if match == True:
-                #print(match)
-                return EOP
-        return 'Unknown END'
+                data = {'eop': EOP,
+                }
+                return data
+        return data
         
     def decode_ext_header(self, header):
         data = {
