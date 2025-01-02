@@ -725,7 +725,7 @@ def decode_id_header_data_object(word, address_cmd):
     usb_communications_capable_as_usb_device = (word >> 30) & 0x1
     _product_type_ufp = (word >> 27) & 0x7
     modal_operation_supported = (word >> 26) & 0x1
-    _product_type_dfp = (word >> 27) & 0x7
+    _product_type_dfp = (word >> 23) & 0x7
     _connector_type = (word >> 21) & 0x3
     usb_vendor_id = word & 0xFFFF
     data['usb_communications_capable_as_usb_host'] = usb_communications_capable_as_usb_host
@@ -733,13 +733,12 @@ def decode_id_header_data_object(word, address_cmd):
     if address_cmd == 'SOP':
         data['product_type_ufp'] = product_type_ufp_sop[_product_type_ufp]
         data['product_type_dfp'] = product_type_dfp_sop[_product_type_dfp]
-    elif address_cmd == 'SOP_prime':
+    if address_cmd == 'SOP_prime':
         data['product_type_ufp'] = product_type_ufp_sop_prime[_product_type_ufp]
         data['product_type_dfp'] = str('Reserved')
     data['modal_operation_supported'] = modal_operation_supported
     data['connector_type'] = connector_type[_connector_type]
-    data['usb_vendor_id'] = str(hex(usb_vendor_id))
-        
+    data['usb_vendor_id'] = str(hex(usb_vendor_id)) 
     return frame_type, data
     
 def decode_cert_stat_vdo(word):

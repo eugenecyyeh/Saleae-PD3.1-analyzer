@@ -1795,7 +1795,7 @@ class Hla(HighLevelAnalyzer):
                     if VDO_header_command == 'Discover Identity' and VDO_header_command_type == 'ACK':
                         if object_index == 2:
                             frame_type, data_object_data = decode_id_header_data_object(
-                                object_int, address_cmd)
+                                object_int, address_cmd['address'])
                             #frame_type, data_object_data = decode_id_header_data_object_3.1(
                             #    object_int, address_cmd)
                             data_object_type = frame_type
