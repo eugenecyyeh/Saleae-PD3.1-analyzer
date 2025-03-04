@@ -467,9 +467,9 @@ class Hla(HighLevelAnalyzer):
             self.leftover_bits.append(next.data['data'])
             self.leftover_time.append(next.start_time)
             self.leftover_time_end.append(next.end_time)
-            if address_cmd == 'Hard Reset' :
+            if address_cmd['address'] == 'Hard Reset' :
                continue
-            if address_cmd == 'Cable Reset' :
+            if address_cmd['address'] == 'Cable Reset' :
                continue
             #
             yield from self.get_bits(20)
