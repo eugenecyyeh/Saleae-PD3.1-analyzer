@@ -491,8 +491,8 @@ def decode_source_power_data_object(word, object_index): #3.1
         maximum_voltage_50mv_units = int((word >> 20) & 0x3FF) * 0.05
         minimum_voltage_50mv_units = int((word >> 10) & 0x3FF) * 0.05
         maximum_allowable_power = int(word & 0x3FF) * 0.25
-        data['maximum_voltage_V'] = str(f'{maximum_voltage}V')
-        data['minimum_voltage_V'] = str(f'{minimum_voltage}V')
+        data['maximum_voltage_V'] = str(f'{maximum_voltage_50mv_units}V')
+        data['minimum_voltage_V'] = str(f'{minimum_voltage_50mv_units}V')
         data['maximum_allowable_power_W'] = str(f'{maximum_allowable_power}W')
         frame_type = 'source_battery_supply_pdo'
         data['pdo_type'] = pdo_type_str
