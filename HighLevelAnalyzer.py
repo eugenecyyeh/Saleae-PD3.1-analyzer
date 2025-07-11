@@ -25,6 +25,7 @@ encoding_lookup = {
 Preamble_LSB ={
     'Preamble': [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
     'Preamble missing first of UI': [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
+    'Preamble_test': [0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],
 }
 
 addresses = {
@@ -416,19 +417,40 @@ class Hla(HighLevelAnalyzer):
         self.leftover_time_end.clear()
         while True:
             while len(self.leftover_bits) < 64:
+                old_length = len(self.leftover_bits)
                 yield from self.get_bits(64)
-                if len(self.leftover_bits) >= 64:   
-                    z=63
-                    x=0
-                    while x < z:
-                        if float(self.leftover_time[x + 1]-self.leftover_time[x]) >= 4.7e-06:
+                if len(self.leftover_bits) == old_length:
+                    print("Insufficient data")
+                    return 
+                if len(self.leftover_bits) >= 64:
+                    restart_needed = False
+                    x = 0
+                    while x < len(self.leftover_bits) - 1:
+                        time_diff = float(self.leftover_time[x + 1] - self.leftover_time[x])
+                        threshold = 4.7e-06 if x == 0 else 4e-06
+                        if time_diff > 6e-06:
                             del self.leftover_bits[:x+1]
                             del self.leftover_time[:x+1]
                             del self.leftover_time_end[:x+1]
-                            x=0
-                            z=len(self.leftover_bits)-1
+                            restart_needed = True
+                            break
+                        if time_diff > threshold:
+                            del self.leftover_bits[:x+1]
+                            del self.leftover_time[:x+1]
+                            del self.leftover_time_end[:x+1]
+                            x = 0
                         else:
-                            x=x+1  
+                            x += 1
+                    if restart_needed:
+                        continue    
+            
+            target_pattern = [0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]
+            if len(self.leftover_bits) == 64 and self.leftover_bits == target_pattern:
+                yield from self.get_bits(65)
+            
+            #if len(self.leftover_bits) < 64:
+            #    print("Insufficient data")
+            #    continue
             #
             preamble_cmd = self.decode_preamble(self.leftover_bits)
             if preamble_cmd['preamble'] == 'Preamble missing first of UI':
@@ -446,6 +468,15 @@ class Hla(HighLevelAnalyzer):
                 self.leftover_bits = self.leftover_bits[64:]
                 self.leftover_time = self.leftover_time[64:]
                 self.leftover_time_end = self.leftover_time_end[64:]
+                self.leftover_bits.append(next.data['data'])
+                self.leftover_time.append(next.start_time)
+                self.leftover_time_end.append(next.end_time)
+            elif preamble_cmd['preamble'] == 'Preamble_test':
+                print(preamble_cmd['preamble'])
+                next = yield AnalyzerFrame('preamble', self.leftover_time[0], self.leftover_time_end[64], preamble_cmd)
+                self.leftover_bits = self.leftover_bits[65:]
+                self.leftover_time = self.leftover_time[65:]
+                self.leftover_time_end = self.leftover_time_end[65:]
                 self.leftover_bits.append(next.data['data'])
                 self.leftover_time.append(next.start_time)
                 self.leftover_time_end.append(next.end_time)
@@ -1789,15 +1820,14 @@ class Hla(HighLevelAnalyzer):
                         data_object_type = frame_type
                         data_object_data['index'] = object_index
                         data_object_data['raw'] = hex(object_int)
-                        VDO_header_command = data_object_data['command']
-                        VDO_header_command_type = data_object_data['command_type']
-                        SVID = data_object_data['vendor_id']
+                        if data_object_type == 'structured_header_vdo':
+                            VDO_header_command = data_object_data['command']
+                            VDO_header_command_type = data_object_data['command_type']
+                            SVID = data_object_data['vendor_id']
                     if VDO_header_command == 'Discover Identity' and VDO_header_command_type == 'ACK':
                         if object_index == 2:
                             frame_type, data_object_data = decode_id_header_data_object(
                                 object_int, address_cmd['address'])
-                            #frame_type, data_object_data = decode_id_header_data_object_3.1(
-                            #    object_int, address_cmd)
                             data_object_type = frame_type
                             data_object_data['index'] = object_index
                             data_object_data['raw'] = hex(object_int)
@@ -1950,29 +1980,6 @@ class Hla(HighLevelAnalyzer):
             self.leftover_time.append(next.start_time)
             self.leftover_time_end.append(next.end_time)
 
-
-    def get_bits_preamble(self, preamble_start, preamble_end, num_bits):
-        bits_needed = int(num_bits - len(self.leftover_bits))
-        #print('bits_needed',bits_needed)
-        word_start = None
-        word_end = None
-        raw_bits = []
-        raw_bits = self.leftover_bits
-        if bits_needed == 0:
-            word_start = preamble_start
-            word_end = preamble_end
-            return Word(word_start, word_end, raw_bits)
-        else:
-            for x in range(bits_needed):
-                frame = yield
-                raw_bits.append(frame.data['data'])
-                preamble_start.append(frame.start_time)
-                preamble_end.append(frame.end_time)
-
-            word_start = preamble_start
-            word_end = preamble_end
-            return Word(word_start, word_end, raw_bits)
-
     def get_bits(self, num_bits):
         bits_needed = int(num_bits - len(self.leftover_bits))
         #print('bits_needed',bits_needed)
@@ -2021,18 +2028,26 @@ class Hla(HighLevelAnalyzer):
             #load address from addresses
             raw_preamble = Preamble_LSB[preamble]
             match = True
-            data={'preamble': 'Missing the Preamble',
-            }         
-            if bits[0]==0:
-                for i in range(64):
+            data={'preamble': 'empty'
+            }
+            if bits[0]==0 and bits[1]==1:
+                for i in range(len(raw_preamble)):
                     if bits[i] != raw_preamble[i]:
                         match = False
                 if match == True:
                     data={'preamble': preamble,
                     }
                     return data                 
-            elif bits[0]==1:
-                for i in range(63):
+            elif bits[0]==1 and bits[1]==0:
+                for i in range(len(raw_preamble)):
+                    if bits[i] != raw_preamble[i]:
+                        match = False
+                if match == True:
+                    data={'preamble': preamble,
+                    }
+                    return data
+            elif len(bits)==65:
+                for i in range(len(raw_preamble)):
                     if bits[i] != raw_preamble[i]:
                         match = False
                 if match == True:
