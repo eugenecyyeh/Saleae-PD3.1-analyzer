@@ -2,7 +2,7 @@
   "name": "PD3.1 Analyzer",
   "apiVersion": "1.0.0",
   "author": "Eugene Yeh",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "description": "PD3.1 Analyzer",
   "extensions": {
     "PD3.1 Analyzer": {
